@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="initial-scale=1, width=device-width" />
+
+    <title>TPS INFORMATION DISPLAY</title>
+    <link rel="stylesheet" href="./styles/global.css" />
+    <link rel="stylesheet" href="./styles/style.css" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,500;0,700;0,800;1,700&display=swap"
+    />
+  </head>
+  <body>
+    <div class="tv-1">
+      <main class="footer">
+        <header class="footer-child"></header>
+        <div class="rectangle-parent">
+          <div class="frame-child"></div>
+          <footer class="running-teks">
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis
+            semper dolor. Nunc purus nisi.
+          </footer>
+        </div>
+      </main>
+
+      <div class="content">
+        <div class="left-panel">
+          <div class="header">
+            <div class="header-bg"></div>
+            <h1 class="header-title">TPS INFORMATION</h1>
+          </div>
+          <div class="article-preview">
+            <div class="article-content">
+              <img
+                class="media"
+                loading="lazy"
+                alt=""
+                src="./assets/image.png"
+              />
+
+              <b class="judul">
+                Lorem ipsum dolor sit, amet consectetur adipisicing elit
+              </b>
+              <div class="deskripsi">
+                Lorem ipsum dolor sit amet, consectetur adipisicing elit. Molestiae dolores eos, ea sapiente fugiat qui dicta maiores modi totam velit nam quis eaque sint soluta repellendus necessitatibus quibusdam recusandae ullam.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="right-panel">
+        <div class="panel">
+          <a id="current-time" class="a">12.10.10</a>
+          <div class="icon-tag">
+            <img
+              class="icon"
+              loading="lazy"
+              alt=""
+              src="./assets/tps-logo.png"
+            />
+          </div>
+        </div>
+
+        <!-- Events -->
+        <div class="events">
+          <div class="events-title">
+            <h3 class="upcoming-events">Upcoming Events</h3>
+            <div class="events-list">
+              <div class="events-list-child"></div>
+              <a class="date">13 Agustus 2024</a>
+            </div>
+          </div>
+
+          <div class="rectangle-group">
+            <div class="frame-item"></div>
+            <div class="chart-grid">
+              <div class="chart-grid-child"></div>
+              <div class="waktu-mulai">09.30</div>
+            </div>
+            <div class="title-wrapper">
+              <div class="title-event">Rapat Rutinan</div>
+            </div>
+          </div>
+          
+          <div class="events-title1">
+            <div class="events-title-child"></div>
+            <div class="rectangle-container">
+              <div class="frame-inner"></div>
+              <div class="waktu-mulai">12.10</div>
+            </div>
+            <div class="on-title-wrapper">
+              <b class="on-title-event">Rapat Koordinasi</b>
+            </div>
+          </div>
+
+          <div class="rectangle-group">
+            <div class="frame-item"></div>
+            <div class="chart-grid">
+              <div class="chart-grid-child"></div>
+              <div class="waktu-mulai">13.00</div>
+            </div>
+            <div class="title-wrapper">
+              <div class="title-event">Seminar</div>
+            </div>
+          </div>
+
+          <div class="rectangle-group">
+            <div class="frame-item"></div>
+            <div class="chart-grid">
+              <div class="chart-grid-child"></div>
+              <div class="waktu-mulai">14.00</div>
+            </div>
+            <div class="title-wrapper">
+              <div class="title-event">Laporan</div>
+            </div>
+          </div>
+
+          <div class="rectangle-group">
+            <div class="frame-item"></div>
+            <div class="chart-grid">
+              <div class="chart-grid-child"></div>
+              <div class="waktu-mulai">15.00</div>
+            </div>
+            <div class="title-wrapper">
+              <div class="title-event">Evaluasi Keuangan</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function updateTime() {
+        const now = new Date();
+        const hours = now.getHours().toString().padStart(2, '0');
+        const minutes = now.getMinutes().toString().padStart(2, '0');
+        const seconds = now.getSeconds().toString().padStart(2, '0');
+        const timeString = `${hours}.${minutes}.${seconds}`;
+        document.getElementById('current-time').textContent = timeString;
+      }
+
+      updateTime();
+      setInterval(updateTime, 1000);
+    </script>      
+    
+  </body>
+</html>
