@@ -53,6 +53,7 @@ const formatEventTime = (date: Date) => {
 const Display = () => {
   const [data, setData] = useState<EventData[] | null>(null);
   const [mediaUrls, setMediaUrls] = useState<{ [key: number]: string | null }>({});
+  const [mediaTypes, setMediaTypes] = useState<{ [key: number]: string | null }>({});
   const [imageError, setImageError] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>('');
@@ -151,20 +152,17 @@ const Display = () => {
       }
   
       const blob = await response.blob();
-      return URL.createObjectURL(blob);
+      const url = URL.createObjectURL(blob);
+      const type = response.headers.get("Content-Type") || "unknown";
+  
+      setMediaUrls(prev => ({ ...prev, [id_display]: url }));
+      setMediaTypes(prev => ({ ...prev, [id_display]: type }));
+  
+      return url;
     } catch (error) {
       console.error('Error fetching media:', error);
       return null;
     }
-  };  
-
-  const isVideoFile = (url: string | null) => {
-    return url ? url.endsWith(".mp4") : false;
-  };
-  
-  const isYouTubeEmbed = (url: string | null) => {
-    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/;
-    return youtubeRegex.test(url || "");
   };
 
    useEffect(() => {
@@ -246,16 +244,6 @@ const Display = () => {
     };
   }, []);
     
-
-  const rotateEvents = () => {
-    const upcomingEvents = filterUpcomingEvents(data || []);
-    const remainingEvents = upcomingEvents.slice(maxDisplayedEvents);
-
-    if (remainingEvents.length > 0) {
-      setDisplayedEvents(remainingEvents.slice(0, maxDisplayedEvents));
-    }
-  };
-
   const isEventOngoing = (event: EventData) => {
     const now = new Date();
     return now >= new Date(event.waktu_mulai) && now <= new Date(event.waktu_selesai);
@@ -267,6 +255,15 @@ const Display = () => {
   useEffect(() => {
     console.log("Media URL:", mediaUrls[articles[currentArticleIndex]?.id_display]);
   }, [mediaUrls, currentArticleIndex]);
+
+  useEffect(() => {
+    console.log('Updated media URLs:', mediaUrls);
+  }, [mediaUrls]);
+
+  useEffect(() => {
+    console.log("Current Article Index:", currentArticleIndex);
+    console.log("Media URL:", mediaUrls[articles[currentArticleIndex]?.id_display]);
+  }, [mediaUrls, currentArticleIndex]);  
   
   return (
     <>
@@ -313,7 +310,6 @@ const Display = () => {
                       <div key={index} className="marquee">{event.deskripsi}</div>
                     ))
                 ) : (
-                  // Tampilkan konten default saat tidak ada data
                   <div className="marquee">
                     Tidak ada event yang sedang berlangsung
                   </div>
@@ -334,39 +330,26 @@ const Display = () => {
             {
             displayedInformation.length > 0 && displayedInformation[currentArticleIndex] ? (
               <div className="article-content">
-                {/* Jika media adalah video MP4 atau YouTube embed */}
                 {
-                  mediaUrls[articles[currentArticleIndex].id_display] &&
-                  (
-                    isVideoFile(mediaUrls[articles[currentArticleIndex].id_display]) ? (
-                      <video
-                        className="media"
-                        src={mediaUrls[articles[currentArticleIndex].id_display] ?? undefined}
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        controls
-                        onError={(e) => console.error("Video error:", e)}
-                      />
-                    ) : isYouTubeEmbed(mediaUrls[articles[currentArticleIndex].id_display]) ? (
-                      <iframe
-                        className="media"
-                        src={`${mediaUrls[articles[currentArticleIndex].id_display]?.replace('watch?v=', 'embed/')}?autoplay=1&mute=1&loop=1`}
-                        frameBorder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      ></iframe>
-                    ) : (
-                      // Tampilan gambar default atau media lain
-                      <img
-                        className="media"
-                        loading="lazy"
-                        src={mediaUrls[articles[currentArticleIndex].id_display] ?? "/assets/image.png"}
-                        onError={() => setImageError(true)}
-                        alt="No media"
-                      />
-                    )
+                  mediaTypes[articles[currentArticleIndex]?.id_display]?.includes("video") ? (
+                    <video
+                      className="media"
+                      src={mediaUrls[articles[currentArticleIndex]?.id_display] || ""}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      controls
+                      onError={(e) => console.error("Video error:", e)}
+                    />
+                  ) : (
+                    <img
+                      className="media"
+                      loading="lazy"
+                      src={mediaUrls[articles[currentArticleIndex]?.id_display] || "/assets/image.png"}
+                      onError={() => setImageError(true)}
+                      alt="No media"
+                    />
                   )
                 }
                 <b className="judul">{displayedInformation[currentArticleIndex].judul}</b>
