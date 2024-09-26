@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, MutableRefObject } from 'react';
 
 type Lokasi = {
   id_lokasi: number;
@@ -60,10 +60,12 @@ const Display = () => {
   const [displayedEvents, setDisplayedEvents] = useState<EventData[]>([]);
   const [displayedInformation, setDisplayedInformation] = useState<EventData[]>([]);
   const [currentArticleIndex, setCurrentArticleIndex] = useState<number>(0);
-  const currentArticleRotationInterval = useRef<NodeJS.Timeout | null>(null)
+  // const currentArticleRotationInterval = useRef<NodeJS.Timeout | null>(null)
   const [locations, setLocations] = useState<Lokasi[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
   const maxDisplayedEvents = 5;
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const currentArticleRotationInterval: MutableRefObject<number | null> = useRef<number | null>(null);
 
   useEffect(() => {
     setCurrentTime(formatCurrentTime(new Date()));
@@ -167,7 +169,7 @@ const Display = () => {
 
    useEffect(() => {
     pollData();
-    const intervalId = setInterval(pollData, 5000);
+    const intervalId = setInterval(pollData, 60000);
     return () => clearInterval(intervalId);
   }, [selectedLocation]);
 
@@ -219,22 +221,71 @@ const Display = () => {
         return now <= endTime && info.kategori === 'informasi';
       });
 
-      if (upcomingInformation.length === 1) {
-        setCurrentArticleIndex(0);
-        if (currentArticleRotationInterval.current) {
-          clearInterval(currentArticleRotationInterval.current);
-        }
-      } else if (upcomingInformation.length > 1) {
+      if (upcomingInformation.length > 0) {
         setDisplayedInformation(upcomingInformation);
-        if (currentArticleRotationInterval.current) {
-          clearInterval(currentArticleRotationInterval.current);
+        if (upcomingInformation.length === 1) {
+          setCurrentArticleIndex(0);
+        } else {
+          setCurrentArticleIndex(prev => (prev + 1) % upcomingInformation.length);
         }
-        currentArticleRotationInterval.current = setInterval(() => {
-          setCurrentArticleIndex((prevIndex) => (prevIndex + 1) % upcomingInformation.length);
-        }, 3000); // 1000 ms = 1 detik
       }
     }
   }, [data, selectedLocation]);
+
+    const handleLoadedData = () => {
+      if (videoRef.current) {
+        console.log("Video loaded:", videoRef.current.duration);
+      }
+    };
+
+  useEffect(() => {
+    const currentMediaType = mediaTypes[displayedInformation[currentArticleIndex]?.id_display];
+
+    if (currentArticleRotationInterval.current !== null) {
+      window.clearTimeout(currentArticleRotationInterval.current);
+      currentArticleRotationInterval.current = null;
+    }
+
+    if (currentMediaType?.includes("video")) {
+      const videoElement = videoRef.current;
+
+      if (videoElement) {
+        videoElement.play();
+      }
+    } else {
+      currentArticleRotationInterval.current = window.setTimeout(() => {
+        setCurrentArticleIndex((prev) => (prev + 1) % displayedInformation.length);
+      }, 60000);
+    }
+
+    return () => {
+      if (currentArticleRotationInterval.current !== null) {
+        window.clearTimeout(currentArticleRotationInterval.current);
+        currentArticleRotationInterval.current = null;
+      }
+    };
+  }, [currentArticleIndex, mediaTypes, displayedInformation.length, displayedInformation]);
+  
+  const handleLoadedMetadata = (event: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    const videoElement = event.currentTarget;
+    console.log("Video duration:", videoElement.duration);
+
+    if (videoElement.duration && !isNaN(videoElement.duration)) {
+      if (currentArticleRotationInterval.current) {
+        window.clearTimeout(currentArticleRotationInterval.current);
+      }
+
+      currentArticleRotationInterval.current = window.setTimeout(() => {
+        setCurrentArticleIndex((prev) => (prev + 1) % displayedInformation.length);
+      }, videoElement.duration * 1000);
+    } else {
+      console.warn("Duration is NaN or undefined");
+      // Fallback durasi default (misalnya 10 detik)
+      currentArticleRotationInterval.current = window.setTimeout(() => {
+        setCurrentArticleIndex((prev) => (prev + 1) % displayedInformation.length);
+      }, 10000);
+    }
+  };       
 
   useEffect(() => {
     return () => {
@@ -251,19 +302,6 @@ const Display = () => {
 
   const events = data?.filter(event => event.kategori === 'event') || [];
   const articles = data?.filter(event => event.kategori === 'informasi') || [];
-
-  useEffect(() => {
-    console.log("Media URL:", mediaUrls[articles[currentArticleIndex]?.id_display]);
-  }, [mediaUrls, currentArticleIndex]);
-
-  useEffect(() => {
-    console.log('Updated media URLs:', mediaUrls);
-  }, [mediaUrls]);
-
-  useEffect(() => {
-    console.log("Current Article Index:", currentArticleIndex);
-    console.log("Media URL:", mediaUrls[articles[currentArticleIndex]?.id_display]);
-  }, [mediaUrls, currentArticleIndex]);  
   
   return (
     <>
@@ -330,28 +368,26 @@ const Display = () => {
             {
             displayedInformation.length > 0 && displayedInformation[currentArticleIndex] ? (
               <div className="article-content">
-                {
-                  mediaTypes[articles[currentArticleIndex]?.id_display]?.includes("video") ? (
-                    <video
-                      className="media"
-                      src={mediaUrls[articles[currentArticleIndex]?.id_display] || ""}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      controls
-                      onError={(e) => console.error("Video error:", e)}
-                    />
-                  ) : (
-                    <img
-                      className="media"
-                      loading="lazy"
-                      src={mediaUrls[articles[currentArticleIndex]?.id_display] || "/assets/image.png"}
-                      onError={() => setImageError(true)}
-                      alt="No media"
-                    />
-                  )
-                }
+                {mediaTypes[displayedInformation[currentArticleIndex]?.id_display]?.includes("video") ? (
+                  <video
+                    ref={videoRef}
+                    className="media"
+                    src={mediaUrls[displayedInformation[currentArticleIndex]?.id_display] || ""}
+                    autoPlay
+                    muted
+                    playsInline
+                    preload="auto"
+                    onLoadedMetadata={handleLoadedMetadata} // Gunakan event handler yang diperbaiki
+                  />
+                ) : (
+                  <img
+                    className="media"
+                    loading="lazy"
+                    src={mediaUrls[displayedInformation[currentArticleIndex]?.id_display] || "/assets/image.png"}
+                    onError={() => setImageError(true)}
+                    alt="No media"
+                  />
+                )}
                 <b className="judul">{displayedInformation[currentArticleIndex].judul}</b>
                 <div className="deskripsi">{displayedInformation[currentArticleIndex].deskripsi}</div>
               </div>

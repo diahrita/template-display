@@ -120,7 +120,7 @@
   max-width: 100%;
   overflow: hidden;
   object-fit: contain;
-  border: 1px solid red;
+  /* border: 1px solid red; */
 }
 .judul {
   height: 75px;
