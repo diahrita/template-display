@@ -142,30 +142,43 @@ const Display = () => {
 
   const getMediaUrl = async (id_display: number): Promise<string | null> => {
     try {
-      const response = await fetch(`/api/dislok/media?id_display=${id_display}&type=file`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      // Fetch media type file
+      const fileTypeResponse = await fetch(`/api/dislok/media?id_display=${id_display}&type=file`, {
+        method: 'GET',  // Changed to GET
       });
-  
-      if (!response.ok) {
-        throw new Error(`Error fetching media: ${response.status} - ${response.statusText}`);
+    
+      const contentType = fileTypeResponse.headers.get('Content-Type');
+    
+      if (contentType?.includes("video") || contentType?.includes("image")) {
+        // Handle media file (video or image)
+        const blob = await fileTypeResponse.blob();
+        const url = URL.createObjectURL(blob);
+        setMediaUrls(prev => ({ ...prev, [id_display]: url }));
+        setMediaTypes(prev => ({ ...prev, [id_display]: contentType }));
+        return url;
+      } else {
+        // Handle media embed (YouTube)
+        const embedResponse = await fetch(`/api/dislok/media?id_display=${id_display}&type=embed`, {
+          method: 'GET',  // Changed to GET
+        });
+    
+        // Ensure the response is JSON
+        if (embedResponse.headers.get('Content-Type')?.includes('application/json')) {
+          const embedData = await embedResponse.json();
+          const youtubeUrl = embedData.embed_url;
+          setMediaUrls(prev => ({ ...prev, [id_display]: youtubeUrl }));
+          setMediaTypes(prev => ({ ...prev, [id_display]: "youtube" }));
+          return youtubeUrl;
+        } else {
+          console.error('Error: Received non-JSON response for embed media');
+          return null;
+        }
       }
-  
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const type = response.headers.get("Content-Type") || "unknown";
-  
-      setMediaUrls(prev => ({ ...prev, [id_display]: url }));
-      setMediaTypes(prev => ({ ...prev, [id_display]: type }));
-  
-      return url;
     } catch (error) {
       console.error('Error fetching media:', error);
       return null;
     }
-  };
+  };  
 
    useEffect(() => {
     pollData();
@@ -238,33 +251,37 @@ const Display = () => {
       }
     };
 
-  useEffect(() => {
-    const currentMediaType = mediaTypes[displayedInformation[currentArticleIndex]?.id_display];
-
-    if (currentArticleRotationInterval.current !== null) {
-      window.clearTimeout(currentArticleRotationInterval.current);
-      currentArticleRotationInterval.current = null;
-    }
-
-    if (currentMediaType?.includes("video")) {
-      const videoElement = videoRef.current;
-
-      if (videoElement) {
-        videoElement.play();
-      }
-    } else {
-      currentArticleRotationInterval.current = window.setTimeout(() => {
-        setCurrentArticleIndex((prev) => (prev + 1) % displayedInformation.length);
-      }, 60000);
-    }
-
-    return () => {
+    useEffect(() => {
+      const currentMediaType = mediaTypes[displayedInformation[currentArticleIndex]?.id_display];
+    
       if (currentArticleRotationInterval.current !== null) {
         window.clearTimeout(currentArticleRotationInterval.current);
         currentArticleRotationInterval.current = null;
       }
-    };
-  }, [currentArticleIndex, mediaTypes, displayedInformation.length, displayedInformation]);
+    
+      if (currentMediaType?.includes("video")) {
+        const videoElement = videoRef.current;
+        if (videoElement) {
+          videoElement.play();
+        }
+      } else if (currentMediaType === "youtube") {
+        // Tentukan durasi tampilan YouTube (misal: 60 detik)
+        currentArticleRotationInterval.current = window.setTimeout(() => {
+          setCurrentArticleIndex((prev) => (prev + 1) % displayedInformation.length);
+        }, 60000); // Set 60 detik untuk tampilan YouTube
+      } else {
+        currentArticleRotationInterval.current = window.setTimeout(() => {
+          setCurrentArticleIndex((prev) => (prev + 1) % displayedInformation.length);
+        }, 10000); // Durasi default 10 detik
+      }
+    
+      return () => {
+        if (currentArticleRotationInterval.current !== null) {
+          window.clearTimeout(currentArticleRotationInterval.current);
+          currentArticleRotationInterval.current = null;
+        }
+      };
+    }, [currentArticleIndex, mediaTypes, displayedInformation.length, displayedInformation]);    
   
   const handleLoadedMetadata = (event: React.SyntheticEvent<HTMLVideoElement, Event>) => {
     const videoElement = event.currentTarget;
@@ -372,20 +389,29 @@ const Display = () => {
                   <video
                     ref={videoRef}
                     className="media"
-                    src={mediaUrls[displayedInformation[currentArticleIndex]?.id_display] || ""}
+                    src={mediaUrls[displayedInformation[currentArticleIndex]?.id_display] ?? undefined}
                     autoPlay
+                    loop
                     muted
-                    playsInline
-                    preload="auto"
-                    onLoadedMetadata={handleLoadedMetadata} // Gunakan event handler yang diperbaiki
+                    onLoadedMetadata={handleLoadedMetadata}
+                  />
+                ) : mediaTypes[displayedInformation[currentArticleIndex]?.id_display]?.includes("youtube") ? (
+                  <iframe
+                    className="media"
+                    width="560"
+                    height="315"
+                    src={mediaUrls[displayedInformation[currentArticleIndex]?.id_display] ?? undefined}
+                    title="YouTube video player"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
                   />
                 ) : (
                   <img
                     className="media"
-                    loading="lazy"
-                    src={mediaUrls[displayedInformation[currentArticleIndex]?.id_display] || "/assets/image.png"}
+                    src={mediaUrls[displayedInformation[currentArticleIndex]?.id_display] ?? undefined}
                     onError={() => setImageError(true)}
-                    alt="No media"
+                    alt={displayedInformation[currentArticleIndex]?.judul || 'Media'}
                   />
                 )}
                 <b className="judul">{displayedInformation[currentArticleIndex].judul}</b>
