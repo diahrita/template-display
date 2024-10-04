@@ -1,12 +1,5 @@
 'use client';
-import { MutableRefObject, useEffect, useRef, useState } from 'react';
-
-import DOMPurify from 'dompurify';
-import React, { useMemo } from 'react';
-
-type Props = {
-  embedHtml?: string;
-};
+import { useState, useEffect, useRef, MutableRefObject } from 'react';
 
 type Lokasi = {
   id_lokasi: number;
@@ -68,7 +61,6 @@ const Display = () => {
   const [displayedInformation, setDisplayedInformation] = useState<EventData[]>([]);
   const [currentArticleIndex, setCurrentArticleIndex] = useState<number>(0);
   const [locations, setLocations] = useState<Lokasi[]>([]);
-  const [embedHtml, setEmbedHtml] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
   const maxDisplayedEvents = 5;
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -86,7 +78,7 @@ const Display = () => {
     updateCurrentTime();
     const intervalId = setInterval(updateCurrentTime, 1000);
 
-    // return () => clearInterval(intervalId);
+    return () => clearInterval(intervalId);
   }, []);
   
   // mengambil data lokasi
@@ -204,8 +196,6 @@ const Display = () => {
       .sort((a, b) => new Date(a.waktu_mulai).getTime() - new Date(b.waktu_mulai).getTime());
   };
 
-  
-
   useEffect(() => {
     if (data) {
       const upcomingEvents = filterUpcomingEvents(data).filter(event => {
@@ -230,7 +220,6 @@ const Display = () => {
     console.log('Selected Location:', selectedLocation);
     console.log('Data:', data);
   }, [selectedLocation, data]);
-
 
   useEffect(() => {
     if (data) {
@@ -289,7 +278,7 @@ const Display = () => {
       } else {
         currentArticleRotationInterval.current = window.setTimeout(() => {
           setCurrentArticleIndex((prev) => (prev + 1) % displayedInformation.length);
-        }, 60000); 
+        }, 10000); // Durasi default 10 detik
       }
   
       return () => {
@@ -395,7 +384,6 @@ const Display = () => {
             
             {/* Information */}
             <div className="article-preview">
-          
             {
             displayedInformation.length > 0 && displayedInformation[currentArticleIndex] ? (
               <div className="article-content">
@@ -426,7 +414,6 @@ const Display = () => {
                   <div>No information today...</div>
                 )
               }
-              
             </div>
           </div>
         </div>
