@@ -67,30 +67,29 @@ const Display = () => {
   const [displayedEvents, setDisplayedEvents] = useState<EventData[]>([]);
   const [displayedInformation, setDisplayedInformation] = useState<EventData[]>([]);
   const [currentArticleIndex, setCurrentArticleIndex] = useState<number>(0);
-  // const currentArticleRotationInterval = useRef<NodeJS.Timeout | null>(null)
   const [locations, setLocations] = useState<Lokasi[]>([]);
   const [embedHtml, setEmbedHtml] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
   const maxDisplayedEvents = 5;
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [embedHtml, setEmbedHtml] = useState<string | null>(null);
   const currentArticleRotationInterval: MutableRefObject<number | null> = useRef<number | null>(null);
-  const sanitizedHtml = useMemo(() => DOMPurify.sanitize(embedHtml || ''), [embedHtml]);
-  const [videoId, setVideoId] = useState<string | null>(null);
+  const youtubeEmbedRef = useRef<HTMLDivElement | null>(null);
 
+  // update tanggal dan waktu
   useEffect(() => {
-    setCurrentTime(formatCurrentTime(new Date()));
-    setCurrentDate(formatDate(new Date()));
-
     const updateCurrentTime = () => {
       setCurrentTime(formatCurrentTime(new Date()));
       setCurrentDate(formatDate(new Date()));
     };
 
-    // const intervalId = setInterval(updateCurrentTime, 1000);
+    updateCurrentTime();
+    const intervalId = setInterval(updateCurrentTime, 1000);
 
     // return () => clearInterval(intervalId);
   }, []);
-
+  
+  // mengambil data lokasi
   useEffect(() => {
     const fetchLocations = async () => {
       try {
@@ -111,17 +110,16 @@ const Display = () => {
     fetchLocations();
   }, []);
 
-    const pollData = async () => {
-      if (!selectedLocation) {
-        return;
-      }
-      
-      try {
-        const response = await fetch('/api/dislok/find', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({lokasi: selectedLocation}),
-        });
+  const pollData = async () => {
+    if (!selectedLocation) {
+      return;
+    }
+    try {
+      const response = await fetch('/api/dislok/find', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lokasi: selectedLocation }),
+      });
 
       if (!response.ok) {
         throw new Error(`Error: ${response.statusText}`);
@@ -138,11 +136,14 @@ const Display = () => {
         setData(filteredData);
 
         const urls: { [key: number]: string | null } = {};
+        const types: { [key: number]: string | null } = {};
         for (const item of filteredData) {
-          // const url = await getMediaUrl(item.id_display);
-          // urls[item.id_display] = url;
+          const { url, type } = await classifyMedia(item.media, item.id_display);
+          urls[item.id_display] = url;
+          types[item.id_display] = type;
         }
         setMediaUrls(urls);
+        setMediaTypes(types);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -150,74 +151,45 @@ const Display = () => {
     }
   };
 
+  const classifyMedia = async (media: string, id_display: number): Promise<{ url: string | null; type: string }> => {
+    const fileExtension = media.split('.').pop()?.toLowerCase();
 
-  // const getMediaUrl = async (id_display: number): Promise<string | null> => {
-  //   try {
-  //     // Ambil tipe file media (video atau gambar)
-  //     const fileTypeResponse = await fetch(`/api/dislok/media?id_display=${id_display}&type=embed`, {
-  //       method: 'GET',
-  //     });
-  
-  //     const contentType = fileTypeResponse.headers.get('Content-Type');
-  
-  //     if (contentType?.includes("video") || contentType?.includes("image")) {
-  //       // Jika media berupa video atau gambar
-  //       const blob = await fileTypeResponse.blob();
-  //       const url = URL.createObjectURL(blob);
-  //       setMediaUrls(prev => ({ ...prev, [id_display]: url }));
-  //       setMediaTypes(prev => ({ ...prev, [id_display]: contentType }));
-  //       return url;
-  //     } else {
-  //       // Jika media berupa embed (YouTube)
-  //       const embedResponse = await fetch(`/api/dislok/media?id_display=${id_display}&type=embed`, {
-  //         method: 'GET',
-  //       });
-  
-  //       if (embedResponse.headers.get('Content-Type')?.includes('application/json')) {
-  //         const embedData = await embedResponse.json();
-  //         const youtubeUrl = embedData.embed_url; // Ambil URL YouTube dari respons API
-  //         setMediaUrls(prev => ({ ...prev, [id_display]: youtubeUrl }));
-  //         setMediaTypes(prev => ({ ...prev, [id_display]: "youtube" }));
-  //         return youtubeUrl;
-  //       } else {
-  //         console.error('Error: Respons embed bukan dalam format JSON');
-  //         return null;
-  //       }
-  //     }
-  //   } catch (error) {
-  //     console.error('Gagal mengambil media:', error);
-  //     return null;
-  //   }
-  // };
-  
-
-
+    if (['jpg', 'jpeg', 'png'].includes(fileExtension || '')) {
+      const imageUrl = `http://localhost:3333/api/dislok/media?id_display=${id_display}&type=file`;
+      return { url: imageUrl, type: 'image' };
+    } else if (fileExtension === 'mp4') {
+      const videoUrl = `http://localhost:3333/api/dislok/media?id_display=${id_display}&type=file`;
+      return { url: videoUrl, type: 'video' };
+    } else {
+      const embedUrl = `http://localhost:3333/api/dislok/media?id_display=${id_display}&type=embed`;
+      return { url: embedUrl, type: 'youtube' };
+    }
+  };
 
   useEffect(() => {
     const id_display = displayedInformation[currentArticleIndex]?.id_display;
-  
+
     const fetchEmbedCode = async () => {
       try {
         const response = await fetch(`/api/dislok/media?id_display=${id_display}&type=embed`, {
           method: 'GET',
         });
-  
+
         if (!response.ok) {
           throw new Error('Gagal mengambil embed code');
         }
-  
+
         const result = await response.text();
         setEmbedHtml(result);
       } catch (error) {
         console.error('Error fetching embed code:', error);
       }
     };
-  
-    if (id_display) {
-      fetchEmbedCode(); 
+
+    if (id_display && mediaTypes[id_display] === 'youtube') {
+      fetchEmbedCode();
     }
-  }, [currentArticleIndex, displayedInformation, mediaTypes, setCurrentArticleIndex]);
-  
+  }, [currentArticleIndex, displayedInformation, mediaTypes]);
 
    useEffect(() => {
     pollData();
@@ -287,27 +259,30 @@ const Display = () => {
     }
   }, [data, selectedLocation]);
 
-    const handleLoadedData = () => {
-      if (videoRef.current) {
-        console.log("Video loaded:", videoRef.current.duration);
-      }
-    };
-
     useEffect(() => {
-      const currentMediaType = mediaTypes[displayedInformation[currentArticleIndex]?.id_display];
-    
+      const id_display = displayedInformation[currentArticleIndex]?.id_display;
+      const currentMediaType = mediaTypes[id_display];
+  
+      if (youtubeEmbedRef.current && currentMediaType === 'youtube') {
+        const embedHtml = 
+        `<div style="display: flex; justify-content: center; align-items: center; height: 100vh;">
+          <iframe
+            src="http://localhost:3333/api/dislok/media?id_display=${id_display}&type=embed"
+            frameBorder="0"
+            allow="autoplay; encrypted-media"
+            allowFullScreen
+            style="width:100%; height:100%; padding-left:10%;"
+          ></iframe>
+        </div>`;
+        youtubeEmbedRef.current.innerHTML = embedHtml;
+      }
+  
       if (currentArticleRotationInterval.current !== null) {
         window.clearTimeout(currentArticleRotationInterval.current);
         currentArticleRotationInterval.current = null;
       }
-    
-      if (currentMediaType?.includes("video")) {
-        const videoElement = videoRef.current;
-        if (videoElement) {
-          videoElement.play();
-        }
-      } else if (currentMediaType === "youtube") {
-        // Tentukan durasi tampilan YouTube (misal: 60 detik)
+  
+      if (currentMediaType === "youtube") {
         currentArticleRotationInterval.current = window.setTimeout(() => {
           setCurrentArticleIndex((prev) => (prev + 1) % displayedInformation.length);
         }, 60000); // Set 60 detik untuk tampilan YouTube
@@ -316,14 +291,14 @@ const Display = () => {
           setCurrentArticleIndex((prev) => (prev + 1) % displayedInformation.length);
         }, 60000); 
       }
-
+  
       return () => {
         if (currentArticleRotationInterval.current !== null) {
           window.clearTimeout(currentArticleRotationInterval.current);
           currentArticleRotationInterval.current = null;
         }
       };
-    }, [currentArticleIndex, mediaTypes, displayedInformation.length, displayedInformation]);    
+    }, [currentArticleIndex, mediaTypes, displayedInformation.length]);
   
   const handleLoadedMetadata = (event: React.SyntheticEvent<HTMLVideoElement, Event>) => {
     const videoElement = event.currentTarget;
@@ -339,7 +314,6 @@ const Display = () => {
       }, videoElement.duration * 1000);
     } else {
       console.warn("Duration is NaN or undefined");
-      // Fallback durasi default (misalnya 10 detik)
       currentArticleRotationInterval.current = window.setTimeout(() => {
         setCurrentArticleIndex((prev) => (prev + 1) % displayedInformation.length);
       }, 10000);
@@ -358,9 +332,6 @@ const Display = () => {
     const now = new Date();
     return now >= new Date(event.waktu_mulai) && now <= new Date(event.waktu_selesai);
   };
-
-  const events = data?.filter(event => event.kategori === 'event') || [];
-  const articles = data?.filter(event => event.kategori === 'informasi') || [];
   
   return (
     <>
@@ -428,9 +399,26 @@ const Display = () => {
             {
             displayedInformation.length > 0 && displayedInformation[currentArticleIndex] ? (
               <div className="article-content">
-                
-                <div dangerouslySetInnerHTML={{ __html: embedHtml ?? '' }} />
-
+                {mediaTypes[displayedInformation[currentArticleIndex]?.id_display]?.includes("video") ? (
+                  <video
+                    ref={videoRef}
+                    className="media"
+                    src={mediaUrls[displayedInformation[currentArticleIndex]?.id_display] ?? undefined}
+                    autoPlay
+                    loop
+                    muted
+                    onLoadedMetadata={handleLoadedMetadata}
+                  />
+                ) : mediaTypes[displayedInformation[currentArticleIndex]?.id_display]?.includes("youtube") ? (
+                  <div ref={youtubeEmbedRef} className="media"></div>
+                ) : (
+                  <img
+                    className="media"
+                    src={mediaUrls[displayedInformation[currentArticleIndex]?.id_display] ?? undefined}
+                    onError={() => setImageError(true)}
+                    alt={displayedInformation[currentArticleIndex]?.judul || 'Media'}
+                  />
+                )}
                 <b className="judul">{displayedInformation[currentArticleIndex].judul}</b>
                 <div className="deskripsi">{displayedInformation[currentArticleIndex].deskripsi}</div>
               </div>
