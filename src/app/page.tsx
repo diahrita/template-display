@@ -112,21 +112,24 @@ const Display = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lokasi: selectedLocation }),
       });
-
+  
       if (!response.ok) {
         throw new Error(`Error: ${response.statusText}`);
       }
-
+  
       const result = await response.json();
       const newData = result.data;
-
+  
       const filteredData = newData.filter((item: EventData) =>
-        item.lokasi.some((loc) => loc.id_lokasi === selectedLocation)
+        item.lokasi.some((loc) => loc.id_lokasi === selectedLocation) &&
+        item.status === 'aktif' && 
+        new Date(item.waktu_mulai) <= new Date() &&
+        new Date(item.waktu_selesai) >= new Date()
       );
-
+  
       if (JSON.stringify(filteredData) !== JSON.stringify(data)) {
         setData(filteredData);
-
+  
         const urls: { [key: number]: string | null } = {};
         const types: { [key: number]: string | null } = {};
         for (const item of filteredData) {
@@ -141,7 +144,7 @@ const Display = () => {
       console.error('Error fetching data:', error);
       setData([]);
     }
-  };
+  };  
 
   const classifyMedia = async (media: string, id_display: number): Promise<{ url: string | null; type: string }> => {
     const fileExtension = media.split('.').pop()?.toLowerCase();
@@ -192,9 +195,13 @@ const Display = () => {
   const filterUpcomingEvents = (events: EventData[]) => {
     const now = new Date();
     return events
-      .filter(event => new Date(event.waktu_mulai).toDateString() === now.toDateString())
+      .filter(event => 
+        event.status === 'aktif' &&
+        new Date(event.waktu_mulai) <= now &&
+        new Date(event.waktu_selesai) >= now
+      )
       .sort((a, b) => new Date(a.waktu_mulai).getTime() - new Date(b.waktu_mulai).getTime());
-  };
+  };  
 
   useEffect(() => {
     if (data) {
