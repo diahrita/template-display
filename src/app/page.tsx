@@ -62,6 +62,7 @@ const Display = () => {
   const [currentArticleIndex, setCurrentArticleIndex] = useState<number>(0);
   const [locations, setLocations] = useState<Lokasi[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const maxDisplayedEvents = 5;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [embedHtml, setEmbedHtml] = useState<string | null>(null);
@@ -101,6 +102,35 @@ const Display = () => {
   
     fetchLocations();
   }, []);
+
+  const handleLocationChange = async (id_lokasi: number) => {
+    setSelectedLocation(id_lokasi);
+    
+    // Mengambil gambar untuk lokasi yang dipilih
+    try {
+      const response = await fetch(`http://localhost:3333/api/lokasi/media?id_lokasi=${id_lokasi}&type=file`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error fetching image: ${response.statusText}`);
+      }
+
+      const imageBlob = await response.blob();
+      const imageUrl = URL.createObjectURL(imageBlob);
+      setBackgroundImage(imageUrl);
+    } catch (error) {
+      console.error('Error fetching location image:', error);
+      setBackgroundImage(null); // Reset jika terjadi kesalahan
+    }
+  };
+
+  // Update useEffect untuk memanggil handleLocationChange saat selectedLocation berubah
+  useEffect(() => {
+    if (selectedLocation) {
+      handleLocationChange(selectedLocation);
+    }
+  }, [selectedLocation]);
 
   const pollData = async () => {
     if (!selectedLocation) {
@@ -338,7 +368,12 @@ const Display = () => {
         href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,500;0,700;0,800&display=swap"
       />
 
-      <div className="tv-1">
+      <div className="tv-1"
+      style={{
+        backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'none',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}>
         <main className="footer">
           <header className="footer-child" />
           <div className="rectangle-parent">
@@ -375,7 +410,7 @@ const Display = () => {
                     ))
                 ) : (
                   <div className="marquee">
-                    Tidak ada event yang sedang berlangsung
+                    Tidak ada event yang sedang berlangsung hari ini...
                   </div>
                 )}
               </footer>
