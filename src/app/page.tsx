@@ -69,7 +69,8 @@ const Display = () => {
   const youtubeEmbedRef = useRef<HTMLDivElement | null>(null);
 
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
-  
+  const [videoUrl, setVideoUrl] = useState('');
+
 
 
   // update tanggal dan waktu
@@ -163,7 +164,7 @@ const Display = () => {
   };
 
 
-  
+
 
   useEffect(() => {
     const id_display = displayedInformation[currentArticleIndex]?.id_display;
@@ -189,12 +190,6 @@ const Display = () => {
       fetchEmbedCode();
     }
   }, [currentArticleIndex, displayedInformation, mediaTypes]);
-
-  useEffect(() => {
-    pollData();
-    // const intervalId = setInterval(pollData, 60000);
-    // return () => clearInterval(intervalId);
-  }, [selectedLocation]);
 
 
   const filterUpcomingEvents = (events: EventData[]) => {
@@ -228,6 +223,17 @@ const Display = () => {
   useEffect(() => {
     console.log('Selected Location:', selectedLocation);
     console.log('Data:', data);
+
+
+    // Memeriksa apakah data ada dan merupakan array
+    if (Array.isArray(data)) {
+      // Mengambil media dari setiap item dalam data
+      const mediaItems = data.map(item => item.media);
+      console.log('Media Items:', mediaItems);
+    } else {
+      console.log('Data is not an array or is undefined');
+    }
+
   }, [selectedLocation, data]);
 
   useEffect(() => {
@@ -257,99 +263,181 @@ const Display = () => {
     }
   }, [data, selectedLocation]);
 
+
+  const extractVideoUrl = (embedHtml: string): string | null => {
+    const match = embedHtml.match(/src="([^"]+)"/);
+    return match ? match[1].split("?")[0] : null; // Mengambil URL tanpa parameter
+  };
+
+
+  
+useEffect(() => {
+  const performPolling = () => {
+      // Panggil fungsi untuk memuat data media
+      pollData();
+
+      // Ambil nilai durasi dari sessionStorage
+      const storedTimeoutDuration = sessionStorage.getItem("timesduration");
+      const timeoutDuration = storedTimeoutDuration ? parseInt(storedTimeoutDuration, 10) : 10000;
+
+      const timeoutId = setTimeout(() => {
+          setCurrentArticleIndex((prevIndex) => (prevIndex + 1) % displayedInformation.length);
+          performPolling(); 
+      }, timeoutDuration);
+
+      return timeoutId;
+  };
+
+  const timeoutId = performPolling();
+
+  return () => clearTimeout(timeoutId); 
+}, [selectedLocation, displayedInformation.length]);
+
+
   useEffect(() => {
+    const fetchEmbedCode = async () => {
+        const id_display = displayedInformation[currentArticleIndex]?.id_display; 
+        if (!id_display) return;
+
+        try {
+            const response = await fetch(`/api/dislok/media?id_display=${id_display}&type=embed`, {
+                method: 'GET',
+            });
+
+            if (!response.ok) {
+                throw new Error('Gagal mengambil embed code');
+            }
+
+            const result = await response.text();
+            console.log("Embed HTML yang diambil yahh:", result); 
+            setEmbedHtml(result); // Menyimpan embed HTML
+
+            const videoUrl = extractVideoUrl(result); 
+            console.log("URL video yang diekstrak:", videoUrl); 
+            
+            if (videoUrl) {
+                const urlWithAutoplay = new URL(videoUrl);
+                urlWithAutoplay.searchParams.set('autoplay', '1');
+                
+                const finalVideoUrl = urlWithAutoplay.toString(); 
+                sessionStorage.setItem('videoUrl', finalVideoUrl);
+                console.log("URL video dengan autoplay:", finalVideoUrl); 
+                setVideoUrl(finalVideoUrl); 
+            }
+        } catch (error) {
+            console.error('Error fetching embed code:', error);
+        }
+    };
+
+    fetchEmbedCode();
+}, [currentArticleIndex]);
+
+useEffect(() => {
     const id_display = displayedInformation[currentArticleIndex]?.id_display;
     const currentMediaType = mediaTypes[id_display];
-  
+
+    const storedVideoUrl = sessionStorage.getItem('videoUrl');
+
     if (youtubeEmbedRef.current && currentMediaType === 'youtube') {
-      const embedHtml = `
-        <div style="display: flex; justify-content: center; align-items: center; height: 100vh;">
-     <iframe
-            src="http://localhost:3333/api/dislok/media?id_display=${id_display}&type=embed"
-            frameBorder="0"
-            allow="autoplay; encrypted-media"
-            allowFullScreen
-            style="width:100%; height:100%; padding-left:10%;"
-          ></iframe>
+        const embedHtml = 
+        `<div style="display: flex; justify-content: center; align-items: center; height: 100vh;">
+            <iframe
+                src="${storedVideoUrl}" 
+                frameBorder="0"
+                allow="autoplay; encrypted-media"
+                allowFullScreen
+                style="width:100%; height:100%; padding-left:10%;"
+            ></iframe>
         </div>`;
-      youtubeEmbedRef.current.innerHTML = embedHtml;
-  
-      // Extract the video ID and fetch its duration
-      const videoId = extractVideoId(embedHtml);
-      if (videoId) {
-        const storedDuration = sessionStorage.getItem(`videoDuration_${videoId}`);
-        console.log("Stored duration for video session:", storedDuration);
-  
-        const timeoutDuration = storedDuration 
-          ? parseInt(storedDuration, 10) * 1000 
-          : 10000;  // Default to 10 seconds if no stored duration
-  
-        console.log("Timeout Durationssss:", timeoutDuration);
-  
-        // Set timeout for article rotation
-        currentArticleRotationInterval.current = window.setTimeout(() => {
-          setCurrentArticleIndex((prev) => (prev + 1) % displayedInformation.length);
-        }, timeoutDuration);
-  
-        // Fetch and save video duration if not already in sessionStorage
-        if (!storedDuration) {
-          fetchVideoDuration(videoId);
+
+        console.log("HAHAHAHA", storedVideoUrl);
+
+        youtubeEmbedRef.current.innerHTML = embedHtml;
+        const videoId = extractVideoId(embedHtml);
+        console.log("embed html yukss", videoId);
+
+        if (videoId) {
+            const storedDuration = sessionStorage.getItem(`videoDuration_${videoId}`);
+            console.log("Stored duration for video session:", storedDuration);
+
+            const timeoutDuration = storedDuration ? parseInt(storedDuration, 10) * 1000 : 10000; 
+            console.log("Timeout Durationssss:", timeoutDuration);
+
+            sessionStorage.setItem("timesduration", timeoutDuration.toString());
+
+            // Set timeout untuk rotasi artikel
+            currentArticleRotationInterval.current = window.setTimeout(() => {
+                // Cek jika sudah mencapai akhir array
+                setCurrentArticleIndex((prev) => {
+                    if (prev + 1 >= displayedInformation.length) {
+                        return 0; // Kembali ke index 0 jika sudah di akhir
+                    }
+                    return (prev + 1) % displayedInformation.length;
+                });
+            }, timeoutDuration);
+
+            // Fetch and save video duration if not already in sessionStorage
+            if (!storedDuration) {
+                fetchVideoDuration(videoId);
+            }
         }
-      }
     }
-  
+
+    // Membersihkan timeout jika ada
     if (currentArticleRotationInterval.current !== null) {
-      window.clearTimeout(currentArticleRotationInterval.current);
-      currentArticleRotationInterval.current = null;
-    }
-  
-    return () => {
-      if (currentArticleRotationInterval.current !== null) {
         window.clearTimeout(currentArticleRotationInterval.current);
         currentArticleRotationInterval.current = null;
-      }
+    }
+
+    return () => {
+        if (currentArticleRotationInterval.current !== null) {
+            window.clearTimeout(currentArticleRotationInterval.current);
+            currentArticleRotationInterval.current = null;
+        }
     };
-  }, [currentArticleIndex, mediaTypes, displayedInformation.length]);
-  
+}, [currentArticleIndex, mediaTypes, displayedInformation.length, videoUrl]); // Tambahkan videoUrl sebagai dependensi
+
+
+
   const extractVideoId = (embedHtml: string): string | null => {
     const regex = /(?:youtube\.com\/embed\/|youtu\.be\/)([^?&/]+)/;
     const match = embedHtml.match(regex);
     return match ? match[1] : null;
   };
-  
+
   const fetchVideoDuration = async (videoId: string) => {
     const youtubeApiKey = 'AIzaSyAQ1R7IzcNk70379BxWp58PHJ3hw0o8UA8';
     const youtubeApiUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=contentDetails&key=${youtubeApiKey}`;
-  
+
     try {
       const response = await fetch(youtubeApiUrl);
       const youtubeData = await response.json();
       const duration = youtubeData.items[0].contentDetails.duration;
-  
+
       const parsedDuration = parseYouTubeDuration(duration);
       console.log('Video Duration:', parsedDuration);
-      
+
       // Simpan durasi ke session storage dengan kunci yang sesuai dengan videoId
       sessionStorage.setItem(`videoDuration_${videoId}`, parsedDuration.toString());
-  
+
       setVideoDuration(parsedDuration);
     } catch (error) {
       console.error('Error fetching video duration:', error);
     }
   };
-  
+
   const parseYouTubeDuration = (duration: string): number => {
     const regex = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/;
     const matches = duration.match(regex);
     const hours = parseInt(matches?.[1] || '0', 10);
     const minutes = parseInt(matches?.[2] || '0', 10);
     const seconds = parseInt(matches?.[3] || '0', 10);
-  
+
     // Hitung total detik
     const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
     return totalSeconds; // Return sebagai number
   };
-  
+
 
   const handleLoadedMetadata = (event: React.SyntheticEvent<HTMLVideoElement, Event>) => {
     const videoElement = event.currentTarget;
@@ -464,16 +552,16 @@ const Display = () => {
                       />
                     ) : mediaTypes[displayedInformation[currentArticleIndex]?.id_display]?.includes("youtube") ? (
                       <div ref={youtubeEmbedRef} className="media"></div>
-                      
-                    ) 
-                    : (
-                      <img
-                        className="media"
-                        src={mediaUrls[displayedInformation[currentArticleIndex]?.id_display] ?? undefined}
-                        onError={() => setImageError(true)}
-                        alt={displayedInformation[currentArticleIndex]?.judul || 'Media'}
-                      />
-                    )}
+
+                    )
+                      : (
+                        <img
+                          className="media"
+                          src={mediaUrls[displayedInformation[currentArticleIndex]?.id_display] ?? undefined}
+                          onError={() => setImageError(true)}
+                          alt={displayedInformation[currentArticleIndex]?.judul || 'Media'}
+                        />
+                      )}
                     <b className="judul">{displayedInformation[currentArticleIndex].judul}</b>
                     <div className="deskripsi">{displayedInformation[currentArticleIndex].deskripsi}</div>
                   </div>

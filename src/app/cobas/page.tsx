@@ -6,7 +6,7 @@ export default function DisplayMedia() {
   const [videoDuration, setVideoDuration] = useState<string>('');
 
 
-  const id_display = 179;
+  const id_display = 182;
 
   useEffect(() => {
     const fetchEmbedCode = async () => {
@@ -20,7 +20,7 @@ export default function DisplayMedia() {
         }
 
         const result = await response.text();
-        console.log("Embed HTML yang diambil:", result);
+        console.log("Embed HTML yang diambil yahh:", result);
         setEmbedHtml(result);
 
         const videoId = extractVideoId(result);
@@ -34,7 +34,7 @@ export default function DisplayMedia() {
 
     fetchEmbedCode();
   }, [id_display]);
-  
+
 
   const extractVideoId = (embedHtml: string): string | null => {
     const regex = /(?:youtube\.com\/embed\/|youtu\.be\/)([^?&/]+)/;
