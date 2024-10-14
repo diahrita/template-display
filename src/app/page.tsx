@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef, MutableRefObject } from 'react';
+import { MutableRefObject, useEffect, useRef, useState } from 'react';
 
 type Lokasi = {
   id_lokasi: number;
@@ -68,6 +68,10 @@ const Display = () => {
   const currentArticleRotationInterval: MutableRefObject<number | null> = useRef<number | null>(null);
   const youtubeEmbedRef = useRef<HTMLDivElement | null>(null);
 
+  const [videoDuration, setVideoDuration] = useState<number | null>(null);
+  
+
+
   // update tanggal dan waktu
   useEffect(() => {
     const updateCurrentTime = () => {
@@ -80,7 +84,7 @@ const Display = () => {
 
     return () => clearInterval(intervalId);
   }, []);
-  
+
   // mengambil data lokasi
   useEffect(() => {
     const fetchLocations = async () => {
@@ -98,7 +102,7 @@ const Display = () => {
         console.error('Error fetching locations:', error);
       }
     };
-  
+
     fetchLocations();
   }, []);
 
@@ -158,6 +162,9 @@ const Display = () => {
     }
   };
 
+
+  
+
   useEffect(() => {
     const id_display = displayedInformation[currentArticleIndex]?.id_display;
 
@@ -183,11 +190,12 @@ const Display = () => {
     }
   }, [currentArticleIndex, displayedInformation, mediaTypes]);
 
-   useEffect(() => {
+  useEffect(() => {
     pollData();
-    const intervalId = setInterval(pollData, 60000);
-    return () => clearInterval(intervalId);
+    // const intervalId = setInterval(pollData, 60000);
+    // return () => clearInterval(intervalId);
   }, [selectedLocation]);
+
 
   const filterUpcomingEvents = (events: EventData[]) => {
     const now = new Date();
@@ -201,7 +209,7 @@ const Display = () => {
       const upcomingEvents = filterUpcomingEvents(data).filter(event => {
         const now = new Date();
         const endTime = new Date(event.waktu_selesai);
-        return now <= endTime && event.kategori === 'event'; 
+        return now <= endTime && event.kategori === 'event';
       });
 
       setDisplayedEvents(upcomingEvents.slice(0, maxDisplayedEvents));
@@ -211,11 +219,12 @@ const Display = () => {
         const endTime = new Date(info.waktu_selesai);
         return now <= endTime && info.kategori === 'informasi';
       });
-  
+
       setDisplayedInformation(upcomingInformation);
     }
   }, [data, selectedLocation]);
-  
+
+
   useEffect(() => {
     console.log('Selected Location:', selectedLocation);
     console.log('Data:', data);
@@ -248,47 +257,100 @@ const Display = () => {
     }
   }, [data, selectedLocation]);
 
-    useEffect(() => {
-      const id_display = displayedInformation[currentArticleIndex]?.id_display;
-      const currentMediaType = mediaTypes[id_display];
+  useEffect(() => {
+    const id_display = displayedInformation[currentArticleIndex]?.id_display;
+    const currentMediaType = mediaTypes[id_display];
   
-      if (youtubeEmbedRef.current && currentMediaType === 'youtube') {
-        const embedHtml = 
-        `<div style="display: flex; justify-content: center; align-items: center; height: 100vh;">
-          <iframe
+    if (youtubeEmbedRef.current && currentMediaType === 'youtube') {
+      const embedHtml = `
+        <div style="display: flex; justify-content: center; align-items: center; height: 100vh;">
+     <iframe
             src="http://localhost:3333/api/dislok/media?id_display=${id_display}&type=embed"
             frameBorder="0"
             allow="autoplay; encrypted-media"
             allowFullScreen
             style="width:100%; height:100%; padding-left:10%;"
-          ></iframe>
+          ></iframe>
         </div>`;
-        youtubeEmbedRef.current.innerHTML = embedHtml;
-      }
+      youtubeEmbedRef.current.innerHTML = embedHtml;
   
+      // Extract the video ID and fetch its duration
+      const videoId = extractVideoId(embedHtml);
+      if (videoId) {
+        const storedDuration = sessionStorage.getItem(`videoDuration_${videoId}`);
+        console.log("Stored duration for video session:", storedDuration);
+  
+        const timeoutDuration = storedDuration 
+          ? parseInt(storedDuration, 10) * 1000 
+          : 10000;  // Default to 10 seconds if no stored duration
+  
+        console.log("Timeout Durationssss:", timeoutDuration);
+  
+        // Set timeout for article rotation
+        currentArticleRotationInterval.current = window.setTimeout(() => {
+          setCurrentArticleIndex((prev) => (prev + 1) % displayedInformation.length);
+        }, timeoutDuration);
+  
+        // Fetch and save video duration if not already in sessionStorage
+        if (!storedDuration) {
+          fetchVideoDuration(videoId);
+        }
+      }
+    }
+  
+    if (currentArticleRotationInterval.current !== null) {
+      window.clearTimeout(currentArticleRotationInterval.current);
+      currentArticleRotationInterval.current = null;
+    }
+  
+    return () => {
       if (currentArticleRotationInterval.current !== null) {
         window.clearTimeout(currentArticleRotationInterval.current);
         currentArticleRotationInterval.current = null;
       }
+    };
+  }, [currentArticleIndex, mediaTypes, displayedInformation.length]);
   
-      if (currentMediaType === "youtube") {
-        currentArticleRotationInterval.current = window.setTimeout(() => {
-          setCurrentArticleIndex((prev) => (prev + 1) % displayedInformation.length);
-        }, 60000); // Set 60 detik untuk tampilan YouTube
-      } else {
-        currentArticleRotationInterval.current = window.setTimeout(() => {
-          setCurrentArticleIndex((prev) => (prev + 1) % displayedInformation.length);
-        }, 10000); // Durasi default 10 detik
-      }
+  const extractVideoId = (embedHtml: string): string | null => {
+    const regex = /(?:youtube\.com\/embed\/|youtu\.be\/)([^?&/]+)/;
+    const match = embedHtml.match(regex);
+    return match ? match[1] : null;
+  };
   
-      return () => {
-        if (currentArticleRotationInterval.current !== null) {
-          window.clearTimeout(currentArticleRotationInterval.current);
-          currentArticleRotationInterval.current = null;
-        }
-      };
-    }, [currentArticleIndex, mediaTypes, displayedInformation.length]);
+  const fetchVideoDuration = async (videoId: string) => {
+    const youtubeApiKey = 'AIzaSyAQ1R7IzcNk70379BxWp58PHJ3hw0o8UA8';
+    const youtubeApiUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=contentDetails&key=${youtubeApiKey}`;
   
+    try {
+      const response = await fetch(youtubeApiUrl);
+      const youtubeData = await response.json();
+      const duration = youtubeData.items[0].contentDetails.duration;
+  
+      const parsedDuration = parseYouTubeDuration(duration);
+      console.log('Video Duration:', parsedDuration);
+      
+      // Simpan durasi ke session storage dengan kunci yang sesuai dengan videoId
+      sessionStorage.setItem(`videoDuration_${videoId}`, parsedDuration.toString());
+  
+      setVideoDuration(parsedDuration);
+    } catch (error) {
+      console.error('Error fetching video duration:', error);
+    }
+  };
+  
+  const parseYouTubeDuration = (duration: string): number => {
+    const regex = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/;
+    const matches = duration.match(regex);
+    const hours = parseInt(matches?.[1] || '0', 10);
+    const minutes = parseInt(matches?.[2] || '0', 10);
+    const seconds = parseInt(matches?.[3] || '0', 10);
+  
+    // Hitung total detik
+    const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+    return totalSeconds; // Return sebagai number
+  };
+  
+
   const handleLoadedMetadata = (event: React.SyntheticEvent<HTMLVideoElement, Event>) => {
     const videoElement = event.currentTarget;
     console.log("Video duration:", videoElement.duration);
@@ -307,7 +369,10 @@ const Display = () => {
         setCurrentArticleIndex((prev) => (prev + 1) % displayedInformation.length);
       }, 10000);
     }
-  };       
+  };
+
+
+
 
   useEffect(() => {
     return () => {
@@ -316,12 +381,12 @@ const Display = () => {
       }
     };
   }, []);
-    
+
   const isEventOngoing = (event: EventData) => {
     const now = new Date();
     return now >= new Date(event.waktu_mulai) && now <= new Date(event.waktu_selesai);
   };
-  
+
   return (
     <>
       <link rel="stylesheet" href="/styles/global.css" />
@@ -336,7 +401,7 @@ const Display = () => {
           <header className="footer-child" />
           <div className="rectangle-parent">
             <div className="frame-child" />
-              <div className="location">
+            <div className="location">
               <select
                 onChange={(e) => setSelectedLocation(Number(e.target.value))}
                 value={selectedLocation ?? ""}
@@ -348,30 +413,30 @@ const Display = () => {
                   </option>
                 ))}
               </select>
-              </div>
-              <footer className="running-teks">
-                {data && data.some(event => {
-                  const now = new Date();
-                  const startTime = new Date(event.waktu_mulai);
-                  const endTime = new Date(event.waktu_selesai);
-                  return event.kategori === 'event' && now >= startTime && now <= endTime;
-                }) ? (
-                  data
-                    .filter(event => {
-                      const now = new Date();
-                      const startTime = new Date(event.waktu_mulai);
-                      const endTime = new Date(event.waktu_selesai);
-                      return event.kategori === 'event' && now >= startTime && now <= endTime;
-                    })
-                    .map((event, index) => (
-                      <div key={index} className="marquee">{event.deskripsi}</div>
-                    ))
-                ) : (
-                  <div className="marquee">
-                    Tidak ada event yang sedang berlangsung
-                  </div>
-                )}
-              </footer>
+            </div>
+            <footer className="running-teks">
+              {data && data.some(event => {
+                const now = new Date();
+                const startTime = new Date(event.waktu_mulai);
+                const endTime = new Date(event.waktu_selesai);
+                return event.kategori === 'event' && now >= startTime && now <= endTime;
+              }) ? (
+                data
+                  .filter(event => {
+                    const now = new Date();
+                    const startTime = new Date(event.waktu_mulai);
+                    const endTime = new Date(event.waktu_selesai);
+                    return event.kategori === 'event' && now >= startTime && now <= endTime;
+                  })
+                  .map((event, index) => (
+                    <div key={index} className="marquee">{event.deskripsi}</div>
+                  ))
+              ) : (
+                <div className="marquee">
+                  Tidak ada event yang sedang berlangsung
+                </div>
+              )}
+            </footer>
           </div>
         </main>
 
@@ -381,35 +446,37 @@ const Display = () => {
               <div className="header-bg" />
               <h1 className="header-title">TPS INFORMATION</h1>
             </div>
-            
+
             {/* Information */}
             <div className="article-preview">
-            {
-            displayedInformation.length > 0 && displayedInformation[currentArticleIndex] ? (
-              <div className="article-content">
-                {mediaTypes[displayedInformation[currentArticleIndex]?.id_display]?.includes("video") ? (
-                  <video
-                    ref={videoRef}
-                    className="media"
-                    src={mediaUrls[displayedInformation[currentArticleIndex]?.id_display] ?? undefined}
-                    autoPlay
-                    loop
-                    muted
-                    onLoadedMetadata={handleLoadedMetadata}
-                  />
-                ) : mediaTypes[displayedInformation[currentArticleIndex]?.id_display]?.includes("youtube") ? (
-                  <div ref={youtubeEmbedRef} className="media"></div>
-                ) : (
-                  <img
-                    className="media"
-                    src={mediaUrls[displayedInformation[currentArticleIndex]?.id_display] ?? undefined}
-                    onError={() => setImageError(true)}
-                    alt={displayedInformation[currentArticleIndex]?.judul || 'Media'}
-                  />
-                )}
-                <b className="judul">{displayedInformation[currentArticleIndex].judul}</b>
-                <div className="deskripsi">{displayedInformation[currentArticleIndex].deskripsi}</div>
-              </div>
+              {
+                displayedInformation.length > 0 && displayedInformation[currentArticleIndex] ? (
+                  <div className="article-content">
+                    {mediaTypes[displayedInformation[currentArticleIndex]?.id_display]?.includes("video") ? (
+                      <video
+                        ref={videoRef}
+                        className="media"
+                        src={mediaUrls[displayedInformation[currentArticleIndex]?.id_display] ?? undefined}
+                        autoPlay
+                        loop
+                        muted
+                        onLoadedMetadata={handleLoadedMetadata}
+                      />
+                    ) : mediaTypes[displayedInformation[currentArticleIndex]?.id_display]?.includes("youtube") ? (
+                      <div ref={youtubeEmbedRef} className="media"></div>
+                      
+                    ) 
+                    : (
+                      <img
+                        className="media"
+                        src={mediaUrls[displayedInformation[currentArticleIndex]?.id_display] ?? undefined}
+                        onError={() => setImageError(true)}
+                        alt={displayedInformation[currentArticleIndex]?.judul || 'Media'}
+                      />
+                    )}
+                    <b className="judul">{displayedInformation[currentArticleIndex].judul}</b>
+                    <div className="deskripsi">{displayedInformation[currentArticleIndex].deskripsi}</div>
+                  </div>
                 ) : (
                   <div>No information today...</div>
                 )
@@ -433,47 +500,46 @@ const Display = () => {
 
           {/* Events */}
           <div className="events">
-          <div className="events-title">
-            <h3 className="upcoming-events">Upcoming Events</h3>
-            <div className="events-list">
-              <div className="events-list-child"></div>
-              <a className="date">{currentDate}</a>
-            </div>
-          </div>
-
-          {displayedEvents.length > 0 ? (
-            displayedEvents.map((event, index) => (
-              <div key={index} className={isEventOngoing(event) ? "events-title1" : "rectangle-group"}>
-                {isEventOngoing(event) ? (
-                  <>
-                    <div className="events-title-child"></div>
-                    <div className="rectangle-container">
-                      <div className="frame-inner"></div>
-                      <div className="waktu-mulai">{formatEventTime(new Date(event.waktu_mulai))}</div>
-                    </div>
-                    <div className="on-title-wrapper">
-                      <b className="on-title-event">{event.judul}</b>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="frame-item"></div>
-                    <div className="chart-grid">
-                      <div className="chart-grid-child"></div>
-                      <div className="waktu-mulai">{formatEventTime(new Date(event.waktu_mulai))}</div>
-                    </div>
-                    <div className="title-wrapper">
-                      <div className="title-event">{event.judul}</div>
-                    </div>
-                  </>
-                )}
+            <div className="events-title">
+              <h3 className="upcoming-events">Upcoming Events</h3>
+              <div className="events-list">
+                <div className="events-list-child"></div>
+                <a className="date">{currentDate}</a>
               </div>
-            ))
-          ) : (
-            <div>No events today...</div>
-          )}
-        </div>
+            </div>
 
+            {displayedEvents.length > 0 ? (
+              displayedEvents.map((event, index) => (
+                <div key={index} className={isEventOngoing(event) ? "events-title1" : "rectangle-group"}>
+                  {isEventOngoing(event) ? (
+                    <>
+                      <div className="events-title-child"></div>
+                      <div className="rectangle-container">
+                        <div className="frame-inner"></div>
+                        <div className="waktu-mulai">{formatEventTime(new Date(event.waktu_mulai))}</div>
+                      </div>
+                      <div className="on-title-wrapper">
+                        <b className="on-title-event">{event.judul}</b>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="frame-item"></div>
+                      <div className="chart-grid">
+                        <div className="chart-grid-child"></div>
+                        <div className="waktu-mulai">{formatEventTime(new Date(event.waktu_mulai))}</div>
+                      </div>
+                      <div className="title-wrapper">
+                        <div className="title-event">{event.judul}</div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div>No events today...</div>
+            )}
+          </div>
         </div>
       </div>
     </>

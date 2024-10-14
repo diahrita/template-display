@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 
 export default function DisplayMedia() {
   const [embedHtml, setEmbedHtml] = useState<string | null>(null);
-  const id_display = 163;
+  const id_display = 174;
 
   useEffect(() => {
     const fetchEmbedCode = async () => {
