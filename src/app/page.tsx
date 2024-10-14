@@ -269,30 +269,25 @@ const Display = () => {
     return match ? match[1].split("?")[0] : null; // Mengambil URL tanpa parameter
   };
 
-
   useEffect(() => {
     const performPolling = () => {
-        // Panggil fungsi untuk memuat data media
-        pollData(); // Pastikan ini memperbarui data
+        pollData();
 
-        // Ambil nilai durasi dari sessionStorage atau gunakan nilai default
         const storedTimeoutDuration = sessionStorage.getItem("timesduration");
         const timeoutDuration = storedTimeoutDuration ? parseInt(storedTimeoutDuration, 10) : 10000;
 
-        // Set interval untuk memperbarui artikel secara otomatis
         const intervalId = setInterval(() => {
             setCurrentArticleIndex((prevIndex) => (prevIndex + 1) % displayedInformation.length);
-            pollData(); // Memanggil fungsi polling data pada setiap interval
+            pollData();
         }, timeoutDuration);
 
-        return intervalId; // Mengembalikan intervalId untuk pembersihan
+        return intervalId;
     };
 
-    const intervalId = performPolling(); // Inisialisasi polling
+    const intervalId = performPolling();
 
-    // Bersihkan interval saat komponen dibongkar
     return () => clearInterval(intervalId);
-}, [selectedLocation, displayedInformation.length]); // Pastikan dependencies sudah tepat
+}, [selectedLocation, displayedInformation.length]);
 
 
   useEffect(() => {
@@ -311,7 +306,7 @@ const Display = () => {
 
         const result = await response.text();
         console.log("Embed HTML yang diambil yahh:", result);
-        setEmbedHtml(result); // Menyimpan embed HTML
+        setEmbedHtml(result);
 
         const videoUrl = extractVideoUrl(result);
         console.log("URL video yang diekstrak:", videoUrl);
@@ -365,26 +360,22 @@ const Display = () => {
         console.log("Timeout Durationssss:", timeoutDuration);
 
         sessionStorage.setItem("timesduration", timeoutDuration.toString());
-
-        // Set timeout untuk rotasi artikel
+        
         currentArticleRotationInterval.current = window.setTimeout(() => {
-          // Cek jika sudah mencapai akhir array
           setCurrentArticleIndex((prev) => {
             if (prev + 1 >= displayedInformation.length) {
-              return 0; // Kembali ke index 0 jika sudah di akhir
+              return 0; 
             }
             return (prev + 1) % displayedInformation.length;
           });
         }, timeoutDuration);
 
-        // Fetch and save video duration if not already in sessionStorage
+        
         if (!storedDuration) {
           fetchVideoDuration(videoId);
         }
       }
     }
-
-    // Membersihkan timeout jika ada
     if (currentArticleRotationInterval.current !== null) {
       window.clearTimeout(currentArticleRotationInterval.current);
       currentArticleRotationInterval.current = null;
@@ -396,7 +387,7 @@ const Display = () => {
         currentArticleRotationInterval.current = null;
       }
     };
-  }, [currentArticleIndex, mediaTypes, displayedInformation.length, videoUrl]); // Tambahkan videoUrl sebagai dependensi
+  }, [currentArticleIndex, mediaTypes, displayedInformation.length, videoUrl]); 
 
 
 
@@ -414,11 +405,8 @@ const Display = () => {
       const response = await fetch(youtubeApiUrl);
       const youtubeData = await response.json();
       const duration = youtubeData.items[0].contentDetails.duration;
-
       const parsedDuration = parseYouTubeDuration(duration);
       console.log('Video Duration:', parsedDuration);
-
-      // Simpan durasi ke session storage dengan kunci yang sesuai dengan videoId
       sessionStorage.setItem(`videoDuration_${videoId}`, parsedDuration.toString());
 
       setVideoDuration(parsedDuration);
@@ -436,7 +424,7 @@ const Display = () => {
 
     // Hitung total detik
     const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
-    return totalSeconds; // Return sebagai number
+    return totalSeconds; 
   };
 
 
