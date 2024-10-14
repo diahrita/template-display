@@ -270,76 +270,77 @@ const Display = () => {
   };
 
 
-  
-useEffect(() => {
-  const performPolling = () => {
-      // Panggil fungsi untuk memuat data media
-      pollData();
+  useEffect(() => {
+    const performPolling = () => {
+        // Panggil fungsi untuk memuat data media
+        pollData(); // Pastikan ini memperbarui data
 
-      // Ambil nilai durasi dari sessionStorage
-      const storedTimeoutDuration = sessionStorage.getItem("timesduration");
-      const timeoutDuration = storedTimeoutDuration ? parseInt(storedTimeoutDuration, 10) : 10000;
+        // Ambil nilai durasi dari sessionStorage atau gunakan nilai default
+        const storedTimeoutDuration = sessionStorage.getItem("timesduration");
+        const timeoutDuration = storedTimeoutDuration ? parseInt(storedTimeoutDuration, 10) : 10000;
 
-      const timeoutId = setTimeout(() => {
-          setCurrentArticleIndex((prevIndex) => (prevIndex + 1) % displayedInformation.length);
-          performPolling(); 
-      }, timeoutDuration);
+        // Set interval untuk memperbarui artikel secara otomatis
+        const intervalId = setInterval(() => {
+            setCurrentArticleIndex((prevIndex) => (prevIndex + 1) % displayedInformation.length);
+            pollData(); // Memanggil fungsi polling data pada setiap interval
+        }, timeoutDuration);
 
-      return timeoutId;
-  };
+        return intervalId; // Mengembalikan intervalId untuk pembersihan
+    };
 
-  const timeoutId = performPolling();
+    const intervalId = performPolling(); // Inisialisasi polling
 
-  return () => clearTimeout(timeoutId); 
-}, [selectedLocation, displayedInformation.length]);
+    // Bersihkan interval saat komponen dibongkar
+    return () => clearInterval(intervalId);
+}, [selectedLocation, displayedInformation.length]); // Pastikan dependencies sudah tepat
 
 
   useEffect(() => {
     const fetchEmbedCode = async () => {
-        const id_display = displayedInformation[currentArticleIndex]?.id_display; 
-        if (!id_display) return;
+      const id_display = displayedInformation[currentArticleIndex]?.id_display;
+      if (!id_display) return;
 
-        try {
-            const response = await fetch(`/api/dislok/media?id_display=${id_display}&type=embed`, {
-                method: 'GET',
-            });
+      try {
+        const response = await fetch(`/api/dislok/media?id_display=${id_display}&type=embed`, {
+          method: 'GET',
+        });
 
-            if (!response.ok) {
-                throw new Error('Gagal mengambil embed code');
-            }
-
-            const result = await response.text();
-            console.log("Embed HTML yang diambil yahh:", result); 
-            setEmbedHtml(result); // Menyimpan embed HTML
-
-            const videoUrl = extractVideoUrl(result); 
-            console.log("URL video yang diekstrak:", videoUrl); 
-            
-            if (videoUrl) {
-                const urlWithAutoplay = new URL(videoUrl);
-                urlWithAutoplay.searchParams.set('autoplay', '1');
-                
-                const finalVideoUrl = urlWithAutoplay.toString(); 
-                sessionStorage.setItem('videoUrl', finalVideoUrl);
-                console.log("URL video dengan autoplay:", finalVideoUrl); 
-                setVideoUrl(finalVideoUrl); 
-            }
-        } catch (error) {
-            console.error('Error fetching embed code:', error);
+        if (!response.ok) {
+          throw new Error('Gagal mengambil embed code');
         }
+
+        const result = await response.text();
+        console.log("Embed HTML yang diambil yahh:", result);
+        setEmbedHtml(result); // Menyimpan embed HTML
+
+        const videoUrl = extractVideoUrl(result);
+        console.log("URL video yang diekstrak:", videoUrl);
+
+        if (videoUrl) {
+          const urlWithAutoplay = new URL(videoUrl);
+          urlWithAutoplay.searchParams.set('autoplay', '1');
+
+          const finalVideoUrl = urlWithAutoplay.toString();
+          sessionStorage.setItem('videoUrl', finalVideoUrl);
+          console.log("URL video dengan autoplay:", finalVideoUrl);
+          setVideoUrl(finalVideoUrl);
+        }
+      } catch (error) {
+        console.error('Error fetching embed code:', error);
+      }
     };
 
     fetchEmbedCode();
-}, [currentArticleIndex]);
+  }, [currentArticleIndex]);
 
-useEffect(() => {
+  useEffect(() => {
     const id_display = displayedInformation[currentArticleIndex]?.id_display;
     const currentMediaType = mediaTypes[id_display];
 
     const storedVideoUrl = sessionStorage.getItem('videoUrl');
 
     if (youtubeEmbedRef.current && currentMediaType === 'youtube') {
-        const embedHtml = 
+      const embedHtml =
         `<div style="display: flex; justify-content: center; align-items: center; height: 100vh;">
             <iframe
                 src="${storedVideoUrl}" 
@@ -350,52 +351,52 @@ useEffect(() => {
             ></iframe>
         </div>`;
 
-        console.log("HAHAHAHA", storedVideoUrl);
+      console.log("HAHAHAHA", storedVideoUrl);
 
-        youtubeEmbedRef.current.innerHTML = embedHtml;
-        const videoId = extractVideoId(embedHtml);
-        console.log("embed html yukss", videoId);
+      youtubeEmbedRef.current.innerHTML = embedHtml;
+      const videoId = extractVideoId(embedHtml);
+      console.log("embed html yukss", videoId);
 
-        if (videoId) {
-            const storedDuration = sessionStorage.getItem(`videoDuration_${videoId}`);
-            console.log("Stored duration for video session:", storedDuration);
+      if (videoId) {
+        const storedDuration = sessionStorage.getItem(`videoDuration_${videoId}`);
+        console.log("Stored duration for video session:", storedDuration);
 
-            const timeoutDuration = storedDuration ? parseInt(storedDuration, 10) * 1000 : 10000; 
-            console.log("Timeout Durationssss:", timeoutDuration);
+        const timeoutDuration = storedDuration ? parseInt(storedDuration, 10) * 1000 : 10000;
+        console.log("Timeout Durationssss:", timeoutDuration);
 
-            sessionStorage.setItem("timesduration", timeoutDuration.toString());
+        sessionStorage.setItem("timesduration", timeoutDuration.toString());
 
-            // Set timeout untuk rotasi artikel
-            currentArticleRotationInterval.current = window.setTimeout(() => {
-                // Cek jika sudah mencapai akhir array
-                setCurrentArticleIndex((prev) => {
-                    if (prev + 1 >= displayedInformation.length) {
-                        return 0; // Kembali ke index 0 jika sudah di akhir
-                    }
-                    return (prev + 1) % displayedInformation.length;
-                });
-            }, timeoutDuration);
-
-            // Fetch and save video duration if not already in sessionStorage
-            if (!storedDuration) {
-                fetchVideoDuration(videoId);
+        // Set timeout untuk rotasi artikel
+        currentArticleRotationInterval.current = window.setTimeout(() => {
+          // Cek jika sudah mencapai akhir array
+          setCurrentArticleIndex((prev) => {
+            if (prev + 1 >= displayedInformation.length) {
+              return 0; // Kembali ke index 0 jika sudah di akhir
             }
+            return (prev + 1) % displayedInformation.length;
+          });
+        }, timeoutDuration);
+
+        // Fetch and save video duration if not already in sessionStorage
+        if (!storedDuration) {
+          fetchVideoDuration(videoId);
         }
+      }
     }
 
     // Membersihkan timeout jika ada
     if (currentArticleRotationInterval.current !== null) {
-        window.clearTimeout(currentArticleRotationInterval.current);
-        currentArticleRotationInterval.current = null;
+      window.clearTimeout(currentArticleRotationInterval.current);
+      currentArticleRotationInterval.current = null;
     }
 
     return () => {
-        if (currentArticleRotationInterval.current !== null) {
-            window.clearTimeout(currentArticleRotationInterval.current);
-            currentArticleRotationInterval.current = null;
-        }
+      if (currentArticleRotationInterval.current !== null) {
+        window.clearTimeout(currentArticleRotationInterval.current);
+        currentArticleRotationInterval.current = null;
+      }
     };
-}, [currentArticleIndex, mediaTypes, displayedInformation.length, videoUrl]); // Tambahkan videoUrl sebagai dependensi
+  }, [currentArticleIndex, mediaTypes, displayedInformation.length, videoUrl]); // Tambahkan videoUrl sebagai dependensi
 
 
 
