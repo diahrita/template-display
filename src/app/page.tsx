@@ -224,17 +224,19 @@ const Display = () => {
     console.log('Selected Location:', selectedLocation);
     console.log('Data:', data);
 
-
     // Memeriksa apakah data ada dan merupakan array
     if (Array.isArray(data)) {
-      // Mengambil media dari setiap item dalam data
-      const mediaItems = data.map(item => item.media);
-      console.log('Media Items:', mediaItems);
+        // Mengambil media dari setiap item dalam data
+        const mediaItems = data.map(item => item.media);
+        console.log('Media Items:', mediaItems);
+        
+        // Menyimpan mediaItems ke session storage
+        sessionStorage.setItem('mediaItems', JSON.stringify(mediaItems));
     } else {
-      console.log('Data is not an array or is undefined');
+        console.log('Data is not an array or is undefined');
     }
 
-  }, [selectedLocation, data]);
+}, [selectedLocation, data]);
 
   useEffect(() => {
     if (data) {
@@ -290,43 +292,46 @@ const Display = () => {
 }, [selectedLocation, displayedInformation.length]);
 
 
-  useEffect(() => {
-    const fetchEmbedCode = async () => {
-      const id_display = displayedInformation[currentArticleIndex]?.id_display;
-      if (!id_display) return;
 
-      try {
-        const response = await fetch(`/api/dislok/media?id_display=${id_display}&type=embed`, {
-          method: 'GET',
-        });
+useEffect(() => {
+  const fetchEmbedCodeFromStorage = () => {
+    // Mengambil mediaItems dari sessionStorage
+    const storedMediaItems = sessionStorage.getItem('mediaItems');
+    
+    // Memeriksa apakah storedMediaItems tidak null
+    if (!storedMediaItems) {
+      console.log('Tidak ada media items di sessionStorage');
+      return;
+    }
 
-        if (!response.ok) {
-          throw new Error('Gagal mengambil embed code');
-        }
+    // Parse string storedMediaItems menjadi array
+    const mediaItems = JSON.parse(storedMediaItems);
 
-        const result = await response.text();
-        console.log("Embed HTML yang diambil yahh:", result);
-        setEmbedHtml(result);
+    // Mengambil embed HTML berdasarkan currentArticleIndex
+    const result = mediaItems[currentArticleIndex]; // Sesuaikan akses ini sesuai kebutuhan
+    console.log("Embed HTML yang diambil dari storage:", result);
 
-        const videoUrl = extractVideoUrl(result);
-        console.log("URL video yang diekstrak:", videoUrl);
+    // Menyimpan embed HTML dan mengekstrak video URL
+    setEmbedHtml(result);
 
-        if (videoUrl) {
-          const urlWithAutoplay = new URL(videoUrl);
-          urlWithAutoplay.searchParams.set('autoplay', '1');
+    const videoUrl = extractVideoUrl(result);
+    console.log("URL video yang diekstrak:", videoUrl);
 
-          const finalVideoUrl = urlWithAutoplay.toString();
-          sessionStorage.setItem('videoUrl', finalVideoUrl);
-          console.log("URL video dengan autoplay:", finalVideoUrl);
-          setVideoUrl(finalVideoUrl);
-        }
-      } catch (error) {
-        console.error('Error fetching embed code:', error);
-      }
-    };
+    if (videoUrl) {
+      const urlWithAutoplay = new URL(videoUrl);
+      urlWithAutoplay.searchParams.set('autoplay', '1');
 
-    fetchEmbedCode();
-  }, [currentArticleIndex]);
+      const finalVideoUrl = urlWithAutoplay.toString();
+      sessionStorage.setItem('videoUrl', finalVideoUrl);
+      console.log("URL video dengan autoplay:", finalVideoUrl);
+      setVideoUrl(finalVideoUrl);
+    }
+  };
+
+  fetchEmbedCodeFromStorage();
+}, [currentArticleIndex]);
+
+  
 
   useEffect(() => {
     const id_display = displayedInformation[currentArticleIndex]?.id_display;
@@ -447,9 +452,6 @@ const Display = () => {
       }, 10000);
     }
   };
-
-
-
 
   useEffect(() => {
     return () => {
