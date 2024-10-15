@@ -343,7 +343,7 @@ useEffect(() => {
       const embedHtml =
         `<div style="display: flex; justify-content: center; align-items: center; height: 100vh;">
             <iframe
-                src="${storedVideoUrl}" 
+                src="http://localhost:3333/api/dislok/media?id_display=${id_display}&type=embed"
                 frameBorder="0"
                 allow="autoplay; encrypted-media"
                 allowFullScreen
@@ -354,7 +354,21 @@ useEffect(() => {
       console.log("HAHAHAHA", storedVideoUrl);
 
       youtubeEmbedRef.current.innerHTML = embedHtml;
-      const videoId = extractVideoId(embedHtml);
+
+
+      const embedHtmls =
+      `<div style="display: flex; justify-content: center; align-items: center; height: 100vh;">
+          <iframe
+              src="${storedVideoUrl}" 
+              frameBorder="0"
+              allow="autoplay; encrypted-media"
+              allowFullScreen
+              style="width:100%; height:100%; padding-left:10%;"
+          ></iframe>
+      </div>`;
+
+
+      const videoId = extractVideoId(embedHtmls);
       console.log("embed html yukss", videoId);
 
       if (videoId) {
